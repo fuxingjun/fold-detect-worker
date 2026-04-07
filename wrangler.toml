@@ -1,0 +1,30 @@
+name = "fold-detect-worker"
+main = "src/worker.js"
+compatibility_date = "2026-04-07"
+
+[triggers]
+crons = ["0 */6 * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "fold-detect-db"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+
+[vars]
+DATASET_URL = "https://raw.githubusercontent.com/KHwang9883/MobileModels-csv/main/models.csv"
+
+[env.preview]
+name = "fold-detect-worker-preview"
+
+[[env.preview.d1_databases]]
+binding = "DB"
+database_name = "fold-detect-db-preview"
+database_id = "REPLACE_WITH_PREVIEW_D1_DATABASE_ID"
+
+[env.production]
+name = "fold-detect-worker-production"
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "fold-detect-db"
+database_id = "REPLACE_WITH_PRODUCTION_D1_DATABASE_ID"

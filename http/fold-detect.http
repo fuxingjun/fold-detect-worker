@@ -1,0 +1,15 @@
+### 健康检查
+GET http://127.0.0.1:8787/api/health
+
+### 使用默认关键词查询折叠屏型号
+GET http://127.0.0.1:8787/api/fold-models
+
+### 使用自定义关键词查询折叠屏型号
+GET http://127.0.0.1:8787/api/fold-models?keywords=Mate%20X,Magic%20V,Galaxy%20Z%20Fold3
+
+### 手动触发同步, 无Token
+POST http://127.0.0.1:8787/api/sync
+
+### 手动触发同步, 携带Token
+POST http://127.0.0.1:8787/api/sync
+x-sync-token: your-sync-token
