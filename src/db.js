@@ -2,7 +2,8 @@ import { schemaStatements } from "./schema.js";
 
 export async function ensureSchema(db) {
   for (const statement of schemaStatements) {
-    await db.exec(statement);
+    const sql = `${statement.trim().replace(/;\s*$/, "")};`;
+    await db.prepare(sql).run();
   }
 }
 
