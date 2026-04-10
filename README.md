@@ -6,6 +6,7 @@ Cloudflare Workers 服务, 通过 GitHub 自动部署运行, 使用 D1 存储数
 
 - 定时同步数据: 通过 Cron 定时从 MobileModels-csv 拉取并写入 D1。
 - 折叠屏查询: 按关键词筛选折叠屏型号。
+- test-model 判定接口: 使用打分策略识别横向大折并输出置信度。
 - 品牌/型号查询: 支持品牌和型号的精确匹配与模糊匹配。
 - 手动同步: 可通过受保护接口手动触发一次数据同步。
 
@@ -28,7 +29,7 @@ Cloudflare Workers 服务, 通过 GitHub 自动部署运行, 使用 D1 存储数
 
 ### GET /
 
-返回服务功能和 API 列表说明。
+返回服务功能和 API 列表说明, 包含 test-model 判定接口。
 
 ### GET /api/health
 
@@ -39,6 +40,20 @@ Cloudflare Workers 服务, 通过 GitHub 自动部署运行, 使用 D1 存储数
 按关键词查询折叠屏型号。
 
 - `keywords`: 可选, 逗号分隔关键词。
+
+### GET /api/fold-models/verify
+
+使用 `test-model.js` 同源的打分逻辑识别横向大折机型, 返回去重后的候选结果。
+
+返回字段:
+
+- `strategy`: 固定为 `test-model-scoring`
+- `total`: 结果数量
+- `data`: 机型列表, 字段包含 `model`, `brand`, `modelName`, `verName`, `confidence`, `score`, `reasons`
+
+示例:
+
+- `GET /api/fold-models/verify`
 
 ### GET /api/models
 

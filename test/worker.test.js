@@ -144,7 +144,24 @@ describe("worker fetch", () => {
 
     expect(response.status).toBe(200);
     expect(Array.isArray(data.features)).toBe(true);
+    expect(data.features).toContain("test-model 打分判定接口");
+    expect(data.apis.foldVerify).toContain("GET /api/fold-models/verify");
     expect(data.apis.modelSearch).toContain("GET /api/models");
+  });
+
+  it("GET /api/fold-models/verify should return test-model scoring result", async () => {
+    const env = { DB: createMockDb(sampleRows) };
+    const request = new Request("https://example.com/api/fold-models/verify");
+
+    const response = await worker.fetch(request, env);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.strategy).toBe("test-model-scoring");
+    expect(data.total).toBeGreaterThanOrEqual(1);
+    expect(data.data[0]).toHaveProperty("confidence");
+    expect(data.data[0]).toHaveProperty("score");
+    expect(data.data[0]).toHaveProperty("reasons");
   });
 
   it("POST /api/sync should check token", async () => {

@@ -2,6 +2,7 @@ import { parse } from "csv-parse/sync";
 
 export function parseCsv(csvContent) {
   const records = parse(csvContent, {
+    bom: true,
     columns: true,
     skip_empty_lines: true,
     trim: true

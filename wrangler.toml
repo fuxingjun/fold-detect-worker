@@ -8,7 +8,6 @@ crons = ["0 */6 * * *"]
 [[d1_databases]]
 binding = "DB"
 database_name = "fold-detect-db"
-database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
 
 [vars]
 DATASET_URL = "https://raw.githubusercontent.com/KHwang9883/MobileModels-csv/main/models.csv"
