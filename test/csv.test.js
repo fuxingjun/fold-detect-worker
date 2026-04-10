@@ -32,4 +32,16 @@ describe("csv parser", () => {
     expect(rows[0].model).toBe("SM-F9000");
     expect(rows[0].model_name).toBe("Galaxy Fold");
   });
+
+  it("parseCsv should handle quoted comma fields", () => {
+    const csv = [
+      "model,dtype,brand,brand_title,code,code_alias,model_name,ver_name",
+      "X100,mob,vivo,vivo,,,\"X Fold, Collector\",\"CN,Edition\""
+    ].join("\n");
+
+    const rows = parseCsv(csv);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].model_name).toBe("X Fold, Collector");
+    expect(rows[0].ver_name).toBe("CN,Edition");
+  });
 });
