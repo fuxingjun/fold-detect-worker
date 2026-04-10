@@ -128,8 +128,13 @@ async function handleSync(request, env) {
     return json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const result = await syncModels(env);
-  return json({ ok: true, synced: result.count });
+  try {
+    const result = await syncModels(env);
+    return json({ ok: true, synced: result.count });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "sync failed";
+    return json({ error: "sync failed", message }, { status: 500 });
+  }
 }
 
 export default {
