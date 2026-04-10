@@ -1,7 +1,9 @@
-import { schemaSql } from "./schema.js";
+import { schemaStatements } from "./schema.js";
 
 export async function ensureSchema(db) {
-  await db.exec(schemaSql);
+  for (const statement of schemaStatements) {
+    await db.exec(statement);
+  }
 }
 
 export async function getSyncMeta(db) {
