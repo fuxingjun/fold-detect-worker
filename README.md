@@ -45,15 +45,21 @@ Cloudflare Workers 服务, 通过 GitHub 自动部署运行, 使用 D1 存储数
 
 使用 `test-model.js` 同源的打分逻辑识别横向大折机型, 返回去重后的候选结果。
 
+- `min`: 可选, 当 `1` 或 `true` 或 `yes` 时, 返回精简字段, 行为参考 `fold-models.min.json`。
+
 返回字段:
 
 - `strategy`: 固定为 `test-model-scoring`
+- `min`: 是否启用精简返回
 - `total`: 结果数量
 - `data`: 机型列表, 字段包含 `model`, `brand`, `modelName`, `verName`, `confidence`, `score`, `reasons`
+
+当 `min=true` 时, `data` 仅返回: `model`, `brand`, `modelName`。
 
 示例:
 
 - `GET /api/fold-models/verify`
+- `GET /api/fold-models/verify?min=true`
 
 ### GET /api/models
 

@@ -135,18 +135,19 @@ describe("worker fetch", () => {
     expect(data.error).toBe("bad request");
   });
 
-  it("GET / should include feature and api docs", async () => {
+  it("GET / should return detailed text docs", async () => {
     const env = { DB: createMockDb(sampleRows) };
     const request = new Request("https://example.com/");
 
     const response = await worker.fetch(request, env);
-    const data = await response.json();
+    const data = await response.text();
 
     expect(response.status).toBe(200);
-    expect(Array.isArray(data.features)).toBe(true);
-    expect(data.features).toContain("test-model 打分判定接口");
-    expect(data.apis.foldVerify).toContain("GET /api/fold-models/verify");
-    expect(data.apis.modelSearch).toContain("GET /api/models");
+    expect(response.headers.get("content-type")).toContain("text/plain");
+    expect(data).toContain("fold-detect-worker");
+    expect(data).toContain("GET /api/fold-models/verify");
+    expect(data).toContain("POST /api/sync");
+    expect(data).toContain("brand 和 model 至少传一个");
   });
 
   it("GET /api/fold-models/verify should return test-model scoring result", async () => {
@@ -162,6 +163,26 @@ describe("worker fetch", () => {
     expect(data.data[0]).toHaveProperty("confidence");
     expect(data.data[0]).toHaveProperty("score");
     expect(data.data[0]).toHaveProperty("reasons");
+  });
+
+  it("GET /api/fold-models/verify?min=true should return min fields", async () => {
+    const env = { DB: createMockDb(sampleRows) };
+    const request = new Request("https://example.com/api/fold-models/verify?min=true");
+
+    const response = await worker.fetch(request, env);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.strategy).toBe("test-model-scoring");
+    expect(data.min).toBe(true);
+    expect(data.total).toBeGreaterThanOrEqual(1);
+    expect(data.data[0]).toHaveProperty("model");
+    expect(data.data[0]).toHaveProperty("brand");
+    expect(data.data[0]).toHaveProperty("modelName");
+    expect(data.data[0]).not.toHaveProperty("verName");
+    expect(data.data[0]).not.toHaveProperty("confidence");
+    expect(data.data[0]).not.toHaveProperty("score");
+    expect(data.data[0]).not.toHaveProperty("reasons");
   });
 
   it("POST /api/sync should check token", async () => {

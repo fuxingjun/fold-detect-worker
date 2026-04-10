@@ -26,6 +26,16 @@ function json(data, init = {}) {
   });
 }
 
+function text(data, init = {}) {
+  return new Response(data, {
+    ...init,
+    headers: {
+      "content-type": "text/plain; charset=utf-8",
+      ...(init.headers || {})
+    }
+  });
+}
+
 async function handleHealth(env) {
   const meta = await getSyncMeta(env.DB);
   return json({ ok: true, ...meta });
@@ -47,7 +57,15 @@ async function handleFoldModels(request, env) {
   return json({ keywords, total: data.length, data });
 }
 
-async function handleFoldVerify(env) {
+function parseMinMode(rawMin) {
+  const value = String(rawMin || "").trim().toLowerCase();
+  return value === "1" || value === "true" || value === "yes";
+}
+
+async function handleFoldVerify(request, env) {
+  const { searchParams } = new URL(request.url);
+  const min = parseMinMode(searchParams.get("min"));
+
   const { results } = await env.DB.prepare(
     `
     SELECT model, brand_title, model_name, ver_name
@@ -56,9 +74,14 @@ async function handleFoldVerify(env) {
     `
   ).all();
 
-  const data = pickFoldableModels(results || []);
+  const fullData = pickFoldableModels(results || []);
+  const data = min
+    ? fullData.map(({ model, brand, modelName }) => ({ model, brand, modelName }))
+    : fullData;
+
   return json({
     strategy: "test-model-scoring",
+    min,
     total: data.length,
     data
   });
@@ -143,24 +166,50 @@ export default {
     const url = new URL(request.url);
 
     if (request.method === "GET" && url.pathname === "/") {
-      return json({
-        service: "fold-detect-worker",
-        features: [
-          "定时同步 models.csv 到 D1",
-          "折叠屏关键词查询",
-          "test-model 打分判定接口",
-          "品牌/型号精确或模糊查询",
-          "手动触发同步"
-        ],
-        apis: {
-          health: "GET /api/health",
-          foldModels: "GET /api/fold-models?keywords=Mate X,Magic V",
-          foldVerify: "GET /api/fold-models/verify",
-          modelSearch:
-            "GET /api/models?brand=华为&brand_match=fuzzy&model=Mate&model_match=fuzzy&limit=100",
-          sync: "POST /api/sync"
-        }
-      });
+      return text(
+        [
+          "fold-detect-worker",
+          "",
+          "Service: 折叠屏机型检索与同步服务",
+          "Storage: Cloudflare D1",
+          "Dataset: models.csv, 定时同步到 mobile_models 表",
+          "",
+          "Endpoints:",
+          "1) GET /api/health",
+          "   - 用途: 查看最近同步状态",
+          "   - 返回: ok, lastSyncCount, lastSyncAt",
+          "",
+          "2) GET /api/fold-models?keywords=Mate X,Magic V",
+          "   - 用途: 关键词匹配折叠机型",
+          "   - 参数: keywords 可选, 逗号分隔",
+          "   - 返回: keywords, total, data[]",
+          "",
+          "3) GET /api/fold-models/verify",
+          "   - 用途: 使用 test-model 打分策略筛选横向大折",
+          "   - 参数: min 可选, 1|true|yes 时返回精简字段",
+          "   - 返回: strategy, total, data[]",
+          "   - min=true 时 data 字段: model, brand, modelName",
+          "   - data 字段: model, brand, modelName, verName, confidence, score, reasons",
+          "",
+          "4) GET /api/models",
+          "   - 用途: 按品牌或型号查询",
+          "   - 参数:",
+          "     brand, brand_match=fuzzy|exact",
+          "     model, model_match=fuzzy|exact",
+          "     limit=1~500",
+          "   - 约束: brand 和 model 至少传一个",
+          "",
+          "5) POST /api/sync",
+          "   - 用途: 手动触发数据同步",
+          "   - 鉴权: 配置 SYNC_TOKEN 时, 需要请求头 x-sync-token",
+          "   - 返回: ok, synced",
+          "",
+          "Quick Start:",
+          "- GET /api/health",
+          "- GET /api/fold-models/verify",
+          "- POST /api/sync"
+        ].join("\n")
+      );
     }
 
     if (request.method === "GET" && url.pathname === "/api/health") {
@@ -172,7 +221,7 @@ export default {
     }
 
     if (request.method === "GET" && url.pathname === "/api/fold-models/verify") {
-      return handleFoldVerify(env);
+      return handleFoldVerify(request, env);
     }
 
     if (request.method === "POST" && url.pathname === "/api/sync") {

@@ -1,24 +1,33 @@
 ### 健康检查
-GET http://127.0.0.1:8787/api/health
+GET {{host}}/api/health
+
+### 根接口, 查看功能和 API 列表
+GET {{host}}/
 
 ### 使用默认关键词查询折叠屏型号
-GET http://127.0.0.1:8787/api/fold-models
+GET {{host}}/api/fold-models
 
 ### 使用自定义关键词查询折叠屏型号
-GET http://127.0.0.1:8787/api/fold-models?keywords=Mate%20X,Magic%20V,Galaxy%20Z%20Fold3
+GET {{host}}/api/fold-models?keywords=Mate%20X,Magic%20V,Galaxy%20Z%20Fold3
+
+### test-model 打分判定接口
+GET {{host}}/api/fold-models/verify
+
+### test-model 打分判定接口, 精简返回模式, 对齐 fold-models.min.json
+GET {{host}}/api/fold-models/verify?min=true
 
 ### 品牌模糊查询
-GET http://127.0.0.1:8787/api/models?brand=华&brand_match=fuzzy
+GET {{host}}/api/models?brand=华&brand_match=fuzzy
 
 ### 型号精确查询
-GET http://127.0.0.1:8787/api/models?model=Mate%20X5&model_match=exact
+GET {{host}}/api/models?model=Mate%20X5&model_match=exact
 
 ### 品牌和型号组合查询
-GET http://127.0.0.1:8787/api/models?brand=荣耀&brand_match=exact&model=Magic%20V3&model_match=exact&limit=50
+GET {{host}}/api/models?brand=荣耀&brand_match=exact&model=Magic%20V3&model_match=exact&limit=50
 
 ### 手动触发同步, 无Token
-POST http://127.0.0.1:8787/api/sync
+POST {{host}}/api/sync
 
 ### 手动触发同步, 携带Token
-POST http://127.0.0.1:8787/api/sync
+POST {{host}}/api/sync
 x-sync-token: your-sync-token
