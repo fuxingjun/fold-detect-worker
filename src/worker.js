@@ -153,7 +153,13 @@ async function handleSync(request, env) {
 
   try {
     const result = await syncModels(env);
-    return json({ ok: true, synced: result.count });
+    // skipped=true 表示数据集未变化；changed 为本次实际写入的行数（新增/变更/删除）
+    return json({
+      ok: true,
+      synced: result.count,
+      skipped: result.skipped === true,
+      changed: result.changed ?? 0
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "sync failed";
     return json({ error: "sync failed", message }, { status: 500 });

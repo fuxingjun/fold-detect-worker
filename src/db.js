@@ -7,6 +7,15 @@ export async function ensureSchema(db) {
   }
 }
 
+// 读取上次同步时记录的数据集内容哈希，用于判断数据集是否发生变化
+export async function getSyncHash(db) {
+  const row = await db
+    .prepare("SELECT value FROM sync_meta WHERE key = 'last_sync_hash'")
+    .first();
+
+  return row ? row.value : null;
+}
+
 export async function getSyncMeta(db) {
   const row = await db
     .prepare("SELECT value, updated_at FROM sync_meta WHERE key = 'last_sync_count'")
