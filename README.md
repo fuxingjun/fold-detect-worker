@@ -5,6 +5,7 @@ Cloudflare Workers 服务, 通过 GitHub 自动部署运行, 使用 D1 存储数
 ## 项目功能说明
 
 - 定时同步数据: 通过 Cron 定时从 MobileModels-csv 拉取并写入 D1。
+- 企业微信通知: 同步完成后推送结果到企业微信群机器人。
 - 折叠屏查询: 按关键词筛选折叠屏型号。
 - test-model 判定接口: 使用打分策略识别横向大折并输出置信度。
 - 品牌/型号查询: 支持品牌和型号的精确匹配与模糊匹配。
@@ -22,8 +23,23 @@ Cloudflare Workers 服务, 通过 GitHub 自动部署运行, 使用 D1 存储数
 - Variables and Secrets:
   - `SYNC_TOKEN`（可选，建议配置）
   - `DATASET_URL`（可选）
+  - `WECOM_WEBHOOK`（可选，企业微信通知）
 
 4. 保存并重新部署一次。
+
+## 企业微信通知
+
+同步完成后会通过企业微信群机器人 webhook 推送结果:
+
+- 配置方式: 在 Worker Settings 的 Variables and Secrets 中添加 `WECOM_WEBHOOK`（或本地执行 `npx wrangler secret put WECOM_WEBHOOK`）。
+- 取值支持两种形式:
+  - 完整 webhook 地址: `https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx`
+  - 仅机器人 key: `xxx`
+- 通知规则:
+  - 同步成功且数据有变更: 推送成功消息（含总机型数、变更行数）。
+  - 同步失败: 推送失败消息（含错误信息）。
+  - 数据集无变化: 不推送，避免定时任务频繁打扰。
+- 未配置 `WECOM_WEBHOOK` 时自动跳过通知，不影响同步流程；通知发送失败也不会中断同步。
 
 ## API 说明
 

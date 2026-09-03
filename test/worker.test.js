@@ -1,12 +1,19 @@
+import { vi, afterEach } from "vitest";
 import worker from "../src/worker.js";
 
-function createMockDb(rows = []) {
+function createMockDb(rows = [], { syncHash = "3", syncCount = "3" } = {}) {
   return {
     exec: async () => { },
     prepare(sql) {
+      if (sql.includes("last_sync_hash")) {
+        return {
+          first: async () => ({ value: syncHash })
+        };
+      }
+
       if (sql.includes("FROM sync_meta")) {
         return {
-          first: async () => ({ value: "3", updated_at: "2026-04-07 10:00:00" })
+          first: async () => ({ value: syncCount, updated_at: "2026-04-07 10:00:00" })
         };
       }
 
@@ -197,5 +204,132 @@ describe("worker fetch", () => {
 
     const response = await worker.fetch(request, env);
     expect(response.status).toBe(401);
+  });
+});
+
+describe("POST /api/sync wecom notification", () => {
+  const datasetCsv = `model,dtype,brand,brand_title,code,code_alias,model_name,ver_name
+m1,手机,华为,华为,HW1,,Mate X5,典藏版
+`;
+
+  const syncedRow = {
+    model: "m1", dtype: "手机", brand: "华为", brand_title: "华为",
+    code: "HW1", code_alias: "", model_name: "Mate X5", ver_name: "典藏版"
+  };
+
+  // 与 sync.js 中 hashContent 的算法保持一致
+  async function sha256Hex(content) {
+    const digest = await crypto.subtle.digest(
+      "SHA-256",
+      new TextEncoder().encode(content)
+    );
+    return Array.from(new Uint8Array(digest))
+      .map((byte) => byte.toString(16).padStart(2, "0"))
+      .join("");
+  }
+
+  function mockFetchByRoute(csv, wecomCalls) {
+    return vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url) => {
+        if (String(url).includes("qyapi.weixin.qq.com")) {
+          wecomCalls.push(url);
+          return new Response(JSON.stringify({ errcode: 0, errmsg: "ok" }), {
+            headers: { "content-type": "application/json" }
+          });
+        }
+        return new Response(csv);
+      })
+    );
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("should send wecom notification after a successful sync with changes", async () => {
+    const wecomCalls = [];
+    const fetchMock = mockFetchByRoute(datasetCsv, wecomCalls);
+    const env = {
+      DB: createMockDb(),
+      WECOM_WEBHOOK: "test-key"
+    };
+
+    const request = new Request("https://example.com/api/sync", {
+      method: "POST"
+    });
+
+    const response = await worker.fetch(request, env);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.ok).toBe(true);
+    expect(data.synced).toBe(1);
+    expect(wecomCalls).toHaveLength(1);
+
+    const wecomCall = fetchMock.mock.calls.find(([url]) =>
+      String(url).includes("qyapi.weixin.qq.com")
+    );
+    expect(wecomCall[0]).toBe(
+      "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=test-key"
+    );
+    expect(JSON.parse(wecomCall[1].body).text.content).toContain("数据同步完成");
+  });
+
+  it("should not send wecom notification when dataset is unchanged", async () => {
+    const contentHash = await sha256Hex(datasetCsv);
+    const wecomCalls = [];
+    mockFetchByRoute(datasetCsv, wecomCalls);
+    const env = {
+      DB: createMockDb([syncedRow], { syncHash: contentHash }),
+      WECOM_WEBHOOK: "test-key"
+    };
+
+    const request = new Request("https://example.com/api/sync", {
+      method: "POST"
+    });
+
+    const response = await worker.fetch(request, env);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.skipped).toBe(true);
+    expect(wecomCalls).toHaveLength(0);
+  });
+
+  it("should send failure notification and return 500 when sync fails", async () => {
+    const wecomCalls = [];
+    const fetchMock = mockFetchByRoute(datasetCsv, wecomCalls);
+    // 让数据集下载失败: fetch 到非 wecom 地址时抛错
+    fetchMock.mockImplementation(async (url) => {
+      if (String(url).includes("qyapi.weixin.qq.com")) {
+        wecomCalls.push(url);
+        return new Response(JSON.stringify({ errcode: 0, errmsg: "ok" }), {
+          headers: { "content-type": "application/json" }
+        });
+      }
+      return new Response("boom", { status: 500 });
+    });
+
+    const env = {
+      DB: createMockDb(),
+      WECOM_WEBHOOK: "test-key"
+    };
+
+    const request = new Request("https://example.com/api/sync", {
+      method: "POST"
+    });
+
+    const response = await worker.fetch(request, env);
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("sync failed");
+    expect(wecomCalls).toHaveLength(1);
+
+    const wecomCall = fetchMock.mock.calls.find(([url]) =>
+      String(url).includes("qyapi.weixin.qq.com")
+    );
+    expect(JSON.parse(wecomCall[1].body).text.content).toContain("数据同步失败");
   });
 });

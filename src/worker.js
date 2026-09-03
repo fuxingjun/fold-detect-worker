@@ -3,6 +3,7 @@ import { ensureSchema, getSyncMeta, queryMobileModels } from "./db.js";
 import { pickFoldableModels } from "./services/fold-verify.js";
 import { splitKeywords, buildFoldModels } from "./services/filter.js";
 import { syncModels } from "./services/sync.js";
+import { sendWecomText } from "./services/wecom.js";
 
 // Per-worker-instance initialization flag. We call `ensureSchema` once
 // on the first incoming request or scheduled event so table creation
@@ -143,6 +144,55 @@ async function handleModelSearch(request, env) {
   });
 }
 
+function buildSyncSuccessMessage(result) {
+  return [
+    "【fold-detect-worker】数据同步完成",
+    `总机型数: ${result.count}`,
+    `本次变更: ${result.changed ?? 0} 条`,
+    `时间: ${new Date().toISOString()}`
+  ].join("\n");
+}
+
+function buildSyncFailureMessage(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  return [
+    "【fold-detect-worker】数据同步失败",
+    `错误: ${message}`,
+    `时间: ${new Date().toISOString()}`
+  ].join("\n");
+}
+
+// 通知仅作辅助提醒，发送失败不影响同步主流程
+async function notifyQuietly(env, content) {
+  try {
+    await sendWecomText(env, content);
+  } catch (error) {
+    console.error(
+      "wecom notify failed:",
+      error instanceof Error ? error.message : error
+    );
+  }
+}
+
+// 统一同步入口: 完成后按结果发送企业微信通知。
+// - 成功且有变更: 发送成功通知
+// - 成功但数据集无变化(skipped): 不发送, 避免定时任务频繁打扰
+// - 失败: 发送失败通知后继续抛出原始错误
+async function runSync(env) {
+  let result;
+  try {
+    result = await syncModels(env);
+  } catch (error) {
+    await notifyQuietly(env, buildSyncFailureMessage(error));
+    throw error;
+  }
+
+  if (!result.skipped) {
+    await notifyQuietly(env, buildSyncSuccessMessage(result));
+  }
+  return result;
+}
+
 async function handleSync(request, env) {
   const requiredToken = env.SYNC_TOKEN;
   const token = request.headers.get("x-sync-token");
@@ -152,7 +202,7 @@ async function handleSync(request, env) {
   }
 
   try {
-    const result = await syncModels(env);
+    const result = await runSync(env);
     // skipped=true 表示数据集未变化；changed 为本次实际写入的行数（新增/变更/删除）
     return json({
       ok: true,
@@ -210,6 +260,10 @@ export default {
           "   - 鉴权: 配置 SYNC_TOKEN 时, 需要请求头 x-sync-token",
           "   - 返回: ok, synced",
           "",
+          "Notify:",
+          "- 同步完成后通过企业微信群机器人发送通知 (配置 WECOM_WEBHOOK)",
+          "- 数据有变更或同步失败时通知, 无变化时不打扰",
+          "",
           "Quick Start:",
           "- GET /api/health",
           "- GET /api/fold-models/verify",
@@ -243,6 +297,6 @@ export default {
 
   async scheduled(_event, env, ctx) {
     await ensureInitialized(env);
-    ctx.waitUntil(syncModels(env));
+    ctx.waitUntil(runSync(env));
   }
 };
