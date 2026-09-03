@@ -11,3 +11,15 @@ database_name = "fold-detect-db"
 
 [vars]
 DATASET_URL = "https://raw.githubusercontent.com/KHwang9883/MobileModels-csv/main/models.csv"
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+invocation_logs = true
+persist = true
+
+[observability.traces]
+enabled = false
+head_sampling_rate = 1
+persist = true
+
