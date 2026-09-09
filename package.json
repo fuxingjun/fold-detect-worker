@@ -14,7 +14,7 @@
     "worker",
     "foldable",
     "csv",
-    "express",
+    "d1",
     "sqlite"
   ],
   "author": "",

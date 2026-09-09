@@ -1,3 +1,4 @@
+import { describe, it, expect } from "vitest";
 import { parseCsv } from "../src/services/csv.js";
 
 describe("csv parser", () => {

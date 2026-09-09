@@ -144,12 +144,22 @@ async function handleModelSearch(request, env) {
   });
 }
 
+// 通知面向中文用户，统一展示东八区时间
+function formatNowBeijing() {
+  return (
+    new Date(Date.now() + 8 * 3600 * 1000)
+      .toISOString()
+      .replace("T", " ")
+      .slice(0, 19) + " (UTC+8)"
+  );
+}
+
 function buildSyncSuccessMessage(result) {
   return [
     "【fold-detect-worker】数据同步完成",
     `总机型数: ${result.count}`,
     `本次变更: ${result.changed ?? 0} 条`,
-    `时间: ${new Date().toISOString()}`
+    `时间: ${formatNowBeijing()}`
   ].join("\n");
 }
 
@@ -158,7 +168,7 @@ function buildSyncFailureMessage(error) {
   return [
     "【fold-detect-worker】数据同步失败",
     `错误: ${message}`,
-    `时间: ${new Date().toISOString()}`
+    `时间: ${formatNowBeijing()}`
   ].join("\n");
 }
 

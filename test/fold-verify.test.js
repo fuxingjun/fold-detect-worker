@@ -1,3 +1,4 @@
+import { describe, it, expect } from "vitest";
 import { verifyFoldable, pickFoldableModels } from "../src/services/fold-verify.js";
 
 describe("fold verify service", () => {

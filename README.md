@@ -100,6 +100,7 @@ Cloudflare Workers 服务, 通过 GitHub 自动部署运行, 使用 D1 存储数
 手动触发同步。
 
 - 当配置了 `SYNC_TOKEN` 时, 需在请求头传 `x-sync-token`。
+- 返回: `ok`, `synced`（总机型数）, `skipped`（数据集是否无变化）, `changed`（本次写入行数）。
 
 ## 说明
 
