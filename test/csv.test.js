@@ -4,8 +4,8 @@ import { parseCsv } from "../src/services/csv.js";
 describe("csv parser", () => {
   it("parseCsv should parse expected fields", () => {
     const csv = [
-      "model,dtype,brand,brand_title,code,code_alias,model_name,ver_name",
-      "x1,mob,huawei,华为,,,Mate X5,典藏版"
+      "model,dtype,brand,brand_title,code,code_alias,model_name,ver_name,source_file",
+      "x1,mob,huawei,华为,,,Mate X5,典藏版,huawei_cn"
     ].join("\n");
 
     const rows = parseCsv(csv);
@@ -18,8 +18,21 @@ describe("csv parser", () => {
       code: "",
       code_alias: "",
       model_name: "Mate X5",
-      ver_name: "典藏版"
+      ver_name: "典藏版",
+      source_file: "huawei_cn"
     });
+  });
+
+  it("parseCsv should default source_file to empty string when column is absent", () => {
+    // 兼容旧版数据集: 没有 source_file 列时不应报错
+    const csv = [
+      "model,dtype,brand,brand_title,code,code_alias,model_name,ver_name",
+      "x1,mob,huawei,华为,,,Mate X5,典藏版"
+    ].join("\n");
+
+    const rows = parseCsv(csv);
+
+    expect(rows[0].source_file).toBe("");
   });
 
   it("parseCsv should handle UTF-8 BOM header", () => {

@@ -86,7 +86,9 @@ export function parseCsv(csvContent) {
       code: record.code || "",
       code_alias: record.code_alias || "",
       model_name: record.model_name || "",
-      ver_name: record.ver_name || ""
+      ver_name: record.ver_name || "",
+      // 上游来源文件标识 (如 apple_all_en), 用于溯源; 旧版数据集可能没有该列
+      source_file: record.source_file || ""
     };
   });
 

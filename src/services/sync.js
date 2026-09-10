@@ -17,8 +17,23 @@ const COLUMNS = [
   "ver_name"
 ];
 
+// 参与入库的字段 = 业务字段 + 聚合来源列，需与 INSERT 的占位符数量保持一致
+const INSERT_COLUMNS = [...COLUMNS, "sources"];
+
 export async function fetchDataset(url = DATASET_URL) {
-  const response = await fetch(url);
+  // 上游为 raw.githubusercontent.com，边缘缓存可能返回旧版本内容，
+  // 导致本地/不同实例算出的哈希与真实内容不一致（曾把错误哈希固化进 sync_meta 锁死同步）。
+  // 这里禁用缓存并附带时间戳，确保每次拿到的是最新内容。
+  const urlWithNonce = new URL(url);
+  urlWithNonce.searchParams.set("_ts", String(Date.now()));
+
+  const response = await fetch(urlWithNonce.toString(), {
+    cache: "no-store",
+    headers: {
+      "cache-control": "no-cache",
+      pragma: "no-cache"
+    }
+  });
   if (!response.ok) {
     throw new Error(`download dataset failed, status=${response.status}`);
   }
@@ -38,24 +53,60 @@ async function hashContent(content) {
     .join("");
 }
 
-// DB 行与 CSV 记录逐字段对比（DB 中的 NULL 归一化为空串再比较）
+// DB 行与 CSV 记录逐字段对比（DB 中的 NULL 归一化为空串再比较，sources 也参与）
 function isSameRecord(row, record) {
-  return COLUMNS.every((col) => (row[col] ?? "") === (record[col] ?? ""));
+  return INSERT_COLUMNS.every((col) => (row[col] ?? "") === (record[col] ?? ""));
 }
 
-// 数据集存在同一 model 的多条记录（多代号/多来源等），而 mobile_models 以 model 为主键
-// 只能保留一行。这里按 CSV 出现顺序去重、后者覆盖前者，与 INSERT OR REPLACE 的最终结果一致，
-// 避免同一 model 的多个变体各自触发一次覆盖写（曾导致单次同步虚增数千条变更）。
-function dedupeByModel(records) {
+// 数据集存在同一 model 的多条记录（多代号/多语言来源等），而 mobile_models 以 model 为主键
+// 只能保留一行。这里按 CSV 出现顺序聚合：主字段取最后一条（等价于 INSERT OR REPLACE 的最终结果），
+// 同时把该 model 涉及的所有来源文件收集为排序后的 JSON 数组以便溯源。
+// 这样既避免同一 model 的多个变体各自触发一次覆盖写（曾导致单次同步虚增数千条变更），
+// 又不丢失上游的多来源信息。
+function aggregateRecords(records) {
   const byModel = new Map();
   for (const record of records) {
-    byModel.set(record.model, record);
+    const current = byModel.get(record.model);
+    if (!current) {
+      byModel.set(record.model, {
+        ...record,
+        sources: record.source_file ? new Set([record.source_file]) : new Set()
+      });
+      continue;
+    }
+
+    // 保留主字段的「后者覆盖前者」语义
+    const sources = current.sources;
+    Object.assign(current, record);
+    if (record.source_file) sources.add(record.source_file);
+    current.sources = sources;
   }
-  return [...byModel.values()];
+
+  return [...byModel.values()].map((record) => ({
+    ...record,
+    sources: JSON.stringify([...record.sources].sort())
+  }));
 }
 
-// 分批提交语句，兼容不支持 batch 的环境
+// CSV 记录字段与 DB 行字段对齐：source_file 聚合进 sources，逐字段对比时忽略
+function toRow(record) {
+  return { ...record, sources: record.sources ?? "[]" };
+}
+
+// 校验 sync_meta 记录的行数是否与表内实际行数一致
+async function checkRowCountConsistency(db, expectedCount) {
+  const row = await db
+    .prepare("SELECT COUNT(*) AS total FROM mobile_models")
+    .first();
+  const actual = Number(row?.total ?? 0);
+
+  return { ok: expectedCount === actual, actual };
+}
+
+// 分批提交语句，兼容不支持 batch 的环境（测试/轻量实现可能只提供 exec）
 async function runStatements(db, statements) {
+  if (statements.length === 0) return;
+
   for (let i = 0; i < statements.length; i += BATCH_CHUNK_SIZE) {
     const chunk = statements.slice(i, i + BATCH_CHUNK_SIZE);
 
@@ -78,20 +129,32 @@ export async function syncModels(env, url = DATASET_URL) {
 
   // 第一层节省：数据集内容未变化时直接跳过，不产生任何写入。
   // 否则定时任务每天 4 次全量重写约 2.4 万行/次，会超出 D1 每日写入限额。
+  //
+  // 兜底保护：若记录的哈希与内容一致、但记录的行数与表内实际行数不符，
+  // 说明哈希已失真（如 CDN 缓存写入了错误哈希、或上次同步未完整落库）。
+  // 此时忽略哈希强制走一次全量 diff，避免同步被永久锁死。
   if ((await getSyncHash(env.DB)) === contentHash) {
     const meta = await getSyncMeta(env.DB);
-    return { count: meta.lastSyncCount, skipped: true };
+    const consistency = await checkRowCountConsistency(env.DB, meta.lastSyncCount);
+
+    if (consistency.ok) {
+      return { count: meta.lastSyncCount, skipped: true };
+    }
+
+    console.warn(
+      `sync hash matched but row count mismatched (meta=${meta.lastSyncCount}, db=${consistency.actual}), forcing full sync`
+    );
   }
 
-  const validRecords = dedupeByModel(
+  const validRecords = aggregateRecords(
     parseCsv(csvContent).filter((record) => record.model)
-  );
+  ).map(toRow);
 
   // 第二层节省：读全表做逐行 diff，只写入新增/变更/删除的行。
   // D1 读限额（免费版 500 万行/天）远宽于写限额，全表读不构成压力。
   const { results } = await env.DB.prepare(
     `
-    SELECT model, dtype, brand, brand_title, code, code_alias, model_name, ver_name
+    SELECT model, dtype, brand, brand_title, code, code_alias, model_name, ver_name, sources
     FROM mobile_models
     `
   ).all();
@@ -101,8 +164,8 @@ export async function syncModels(env, url = DATASET_URL) {
 
   const insertStmt = env.DB.prepare(`
     INSERT OR REPLACE INTO mobile_models (
-      model, dtype, brand, brand_title, code, code_alias, model_name, ver_name
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      model, dtype, brand, brand_title, code, code_alias, model_name, ver_name, sources
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const deleteStmt = env.DB.prepare("DELETE FROM mobile_models WHERE model = ?");
 
@@ -114,7 +177,7 @@ export async function syncModels(env, url = DATASET_URL) {
     const row = existing.get(record.model);
     // 已存在且字段完全一致则跳过，不产生写入
     if (row && isSameRecord(row, record)) continue;
-    statements.push(insertStmt.bind(...COLUMNS.map((col) => record[col])));
+    statements.push(insertStmt.bind(...INSERT_COLUMNS.map((col) => record[col])));
   }
 
   // DB 中存在但数据集已移除的机型，需要删除以免残留脏数据

@@ -1,9 +1,27 @@
-import { schemaStatements } from "./schema.js";
+import { schemaStatements, migrationStatements } from "./schema.js";
+
+// 判断是否为「列已存在」类的可忽略错误：不同 SQLite 方言下文案略有差异
+function isIgnorableMigrationError(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /duplicate column name|already exists/i.test(message);
+}
 
 export async function ensureSchema(db) {
   for (const statement of schemaStatements) {
     const sql = `${statement.trim().replace(/;\s*$/, "")};`;
     await db.prepare(sql).run();
+  }
+
+  // 迁移仅需执行一次，失败(如列已存在)可安全忽略，不影响主流程
+  for (const statement of migrationStatements) {
+    const sql = `${statement.trim().replace(/;\s*$/, "")};`;
+    try {
+      await db.prepare(sql).run();
+    } catch (error) {
+      if (!isIgnorableMigrationError(error)) {
+        console.warn("schema migration failed:", statement, error);
+      }
+    }
   }
 }
 
@@ -61,7 +79,7 @@ export async function queryMobileModels(
   }
 
   const sql = `
-    SELECT model, brand_title, model_name, ver_name
+    SELECT model, brand_title, model_name, ver_name, sources
     FROM mobile_models
     ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
     ORDER BY brand_title ASC, model_name ASC

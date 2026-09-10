@@ -17,6 +17,13 @@ function createMockDb(rows = [], { syncHash = "3", syncCount = "3" } = {}) {
         };
       }
 
+      // 行数一致性校验 (SELECT COUNT(*) AS total FROM mobile_models)
+      if (sql.includes("COUNT(*)")) {
+        return {
+          first: async () => ({ total: rows.length })
+        };
+      }
+
       if (sql.includes("FROM mobile_models")) {
         let bindParams = [];
         return {
@@ -214,7 +221,7 @@ m1,手机,华为,华为,HW1,,Mate X5,典藏版
 
   const syncedRow = {
     model: "m1", dtype: "手机", brand: "华为", brand_title: "华为",
-    code: "HW1", code_alias: "", model_name: "Mate X5", ver_name: "典藏版"
+    code: "HW1", code_alias: "", model_name: "Mate X5", ver_name: "典藏版", sources: "[]"
   };
 
   // 与 sync.js 中 hashContent 的算法保持一致
@@ -281,7 +288,8 @@ m1,手机,华为,华为,HW1,,Mate X5,典藏版
     const wecomCalls = [];
     mockFetchByRoute(datasetCsv, wecomCalls);
     const env = {
-      DB: createMockDb([syncedRow], { syncHash: contentHash }),
+      // syncCount 需与表内实际行数一致(1)，否则会触发「脏哈希兜底」强制全量同步
+      DB: createMockDb([syncedRow], { syncHash: contentHash, syncCount: "1" }),
       WECOM_WEBHOOK: "test-key"
     };
 

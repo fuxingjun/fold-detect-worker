@@ -92,6 +92,17 @@ function normalizeMatchMode(rawMode) {
   return rawMode === "exact" ? "exact" : "fuzzy";
 }
 
+// DB 中的 sources 为 JSON 数组字符串，对外返回时解析为数组；异常/空值统一回落为空数组
+function parseSources(rawSources) {
+  if (!rawSources) return [];
+  try {
+    const parsed = JSON.parse(rawSources);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 function parseLimit(rawLimit) {
   const parsed = Number(rawLimit || 100);
   if (!Number.isFinite(parsed) || parsed < 1) return 100;
@@ -128,7 +139,8 @@ async function handleModelSearch(request, env) {
     model: row.model,
     brandTitle: row.brand_title,
     modelName: row.model_name,
-    versionName: row.ver_name || ""
+    versionName: row.ver_name || "",
+    sources: parseSources(row.sources)
   }));
 
   return json({

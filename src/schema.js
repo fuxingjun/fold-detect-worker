@@ -8,7 +8,8 @@ export const schemaStatements = [
     code TEXT,
     code_alias TEXT,
     model_name TEXT,
-    ver_name TEXT
+    ver_name TEXT,
+    sources TEXT
   )
   `,
   `
@@ -26,4 +27,9 @@ export const schemaStatements = [
     updated_at TEXT
   )
   `
+];
+
+// 已存在的旧表不会因 CREATE TABLE IF NOT EXISTS 补上新列，需要显式迁移
+export const migrationStatements = [
+  `ALTER TABLE mobile_models ADD COLUMN sources TEXT`
 ];
