@@ -9,7 +9,10 @@ const WEBHOOK_URL =
   "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=test-key";
 
 function mockFetchOnce(handler) {
-  return vi.stubGlobal("fetch", vi.fn(handler));
+  // vi.stubGlobal 不返回 mock 本身，需先创建再 stub 才能拿到 spy
+  const mock = vi.fn(handler);
+  vi.stubGlobal("fetch", mock);
+  return mock;
 }
 
 function wecomOkResponse() {

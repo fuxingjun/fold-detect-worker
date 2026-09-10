@@ -28,7 +28,7 @@ async function sha256Hex(content) {
 // 构造可跟踪写入语句的 mock DB
 function createTrackingDb({ storedHash = null, rows = [] } = {}) {
   const state = { storedHash };
-  const writes = { inserts: [], deletes: [], metaUpserts: [] };
+  const writes = { inserts: [], insertRecords: [], deletes: [], metaUpserts: [] };
 
   const db = {
     batch: async (statements) => {
@@ -36,6 +36,7 @@ function createTrackingDb({ storedHash = null, rows = [] } = {}) {
         // 模拟语句执行：按 SQL 类型归类记录
         if (stmt.sql.includes("INSERT OR REPLACE")) {
           writes.inserts.push(stmt.bindParams[0]);
+          writes.insertRecords.push(stmt.bindParams);
         } else if (stmt.sql.trim().startsWith("DELETE")) {
           writes.deletes.push(stmt.bindParams[0]);
         } else if (stmt.sql.includes("ON CONFLICT")) {
@@ -84,10 +85,10 @@ function createTrackingDb({ storedHash = null, rows = [] } = {}) {
 }
 
 function mockFetchCsv(content) {
-  return vi.stubGlobal(
-    "fetch",
-    vi.fn(async () => new Response(content))
-  );
+  // vi.stubGlobal 不返回 mock 本身，需先创建再 stub 才能拿到 spy
+  const mock = vi.fn(async () => new Response(content));
+  vi.stubGlobal("fetch", mock);
+  return mock;
 }
 
 describe("syncModels", () => {
@@ -144,6 +145,51 @@ describe("syncModels", () => {
     expect(result.changed).toBe(3);
     expect(writes.inserts).toEqual(["m2", "m3"]);
     expect(writes.deletes).toEqual(["m4"]);
+  });
+
+  it("should collapse duplicate model rows to a single write", async () => {
+    // 数据集改版后同一 model 会出现多条记录（多代号/多来源），
+    // DB 以 model 为主键只能存一行，应只写一次且以最后一条为准
+    const duplicatedCsv = `model,dtype,brand,brand_title,code,code_alias,model_name,ver_name
+m1,手机,华为,华为,HW1,,Mate X5,典藏版
+m1,手机,华为,华为,HW2,,Mate X5,标准版
+m2,手机,荣耀,荣耀,HY1,,Magic V3,标准版
+`;
+    mockFetchCsv(duplicatedCsv);
+    const { db, writes } = createTrackingDb({ storedHash: "old-hash", rows: [] });
+
+    const result = await syncModels({ DB: db });
+
+    // 去重后仅剩 2 个唯一机型，且 m1 只写一次
+    expect(result.count).toBe(2);
+    expect(result.changed).toBe(2);
+    expect(writes.inserts).toEqual(["m1", "m2"]);
+    expect(writes.deletes).toHaveLength(0);
+    // 以 CSV 中靠后的记录为准，与 INSERT OR REPLACE 的最终结果一致
+    const m1Record = writes.insertRecords.find((params) => params[0] === "m1");
+    expect(m1Record[4]).toBe("HW2");
+  });
+
+  it("should not rewrite unchanged rows when dataset has duplicate models", async () => {
+    // 回归: 曾因重复主键导致每次同步重复覆盖写数千行
+    const duplicatedCsv = `model,dtype,brand,brand_title,code,code_alias,model_name,ver_name
+m1,手机,华为,华为,HW1,,Mate X5,典藏版
+m1,手机,华为,华为,HW1,,Mate X5,典藏版
+`;
+    mockFetchCsv(duplicatedCsv);
+    const { db, writes } = createTrackingDb({
+      storedHash: "old-hash",
+      rows: [
+        { model: "m1", dtype: "手机", brand: "华为", brand_title: "华为", code: "HW1", code_alias: "", model_name: "Mate X5", ver_name: "典藏版" }
+      ]
+    });
+
+    const result = await syncModels({ DB: db });
+
+    expect(result.count).toBe(1);
+    expect(result.changed).toBe(0);
+    expect(writes.inserts).toHaveLength(0);
+    expect(writes.deletes).toHaveLength(0);
   });
 
   it("should normalize DB NULL to empty string when comparing", async () => {

@@ -229,18 +229,18 @@ m1,手机,华为,华为,HW1,,Mate X5,典藏版
   }
 
   function mockFetchByRoute(csv, wecomCalls) {
-    return vi.stubGlobal(
-      "fetch",
-      vi.fn(async (url) => {
-        if (String(url).includes("qyapi.weixin.qq.com")) {
-          wecomCalls.push(url);
-          return new Response(JSON.stringify({ errcode: 0, errmsg: "ok" }), {
-            headers: { "content-type": "application/json" }
-          });
-        }
-        return new Response(csv);
-      })
-    );
+    // vi.stubGlobal 不返回 mock 本身，需先创建再 stub 才能拿到 spy
+    const mock = vi.fn(async (url) => {
+      if (String(url).includes("qyapi.weixin.qq.com")) {
+        wecomCalls.push(url);
+        return new Response(JSON.stringify({ errcode: 0, errmsg: "ok" }), {
+          headers: { "content-type": "application/json" }
+        });
+      }
+      return new Response(csv);
+    });
+    vi.stubGlobal("fetch", mock);
+    return mock;
   }
 
   afterEach(() => {

@@ -43,6 +43,17 @@ function isSameRecord(row, record) {
   return COLUMNS.every((col) => (row[col] ?? "") === (record[col] ?? ""));
 }
 
+// 数据集存在同一 model 的多条记录（多代号/多来源等），而 mobile_models 以 model 为主键
+// 只能保留一行。这里按 CSV 出现顺序去重、后者覆盖前者，与 INSERT OR REPLACE 的最终结果一致，
+// 避免同一 model 的多个变体各自触发一次覆盖写（曾导致单次同步虚增数千条变更）。
+function dedupeByModel(records) {
+  const byModel = new Map();
+  for (const record of records) {
+    byModel.set(record.model, record);
+  }
+  return [...byModel.values()];
+}
+
 // 分批提交语句，兼容不支持 batch 的环境
 async function runStatements(db, statements) {
   for (let i = 0; i < statements.length; i += BATCH_CHUNK_SIZE) {
@@ -72,7 +83,9 @@ export async function syncModels(env, url = DATASET_URL) {
     return { count: meta.lastSyncCount, skipped: true };
   }
 
-  const validRecords = parseCsv(csvContent).filter((record) => record.model);
+  const validRecords = dedupeByModel(
+    parseCsv(csvContent).filter((record) => record.model)
+  );
 
   // 第二层节省：读全表做逐行 diff，只写入新增/变更/删除的行。
   // D1 读限额（免费版 500 万行/天）远宽于写限额，全表读不构成压力。
