@@ -34,7 +34,7 @@ Cloudflare Workers 服务, 通过 GitHub 自动部署运行, 使用 D1 存储数
 ## HTTP 请求文件（http/ 目录）
 
 使用 VSCode REST Client 插件执行 `http/fold-detect.http` 中的请求。
-请求里的 `{{host}}`、`{{token}}`、`{{deployHook}}` 环境变量读取自 `.vscode/settings.json` 的
+请求里的 `{{host}}`、`{{token}}`、`{{cfToken}}` 环境变量读取自 `.vscode/settings.json` 的
 `rest-client.environmentVariables`（该文件含真实凭据，已被 `.gitignore` 排除）。
 新环境按以下模板在本地 `.vscode/settings.json` 中配置:
 
@@ -44,7 +44,7 @@ Cloudflare Workers 服务, 通过 GitHub 自动部署运行, 使用 D1 存储数
     "local": {
       "host": "https://your-workers-domain",
       "token": "your-sync-token",
-      "deployHook": "https://api.cloudflare.com/client/v4/workers/builds/deploy_hooks/your-hook-id"
+      "cfToken": "your-cloudflare-deploy-hook-id"
     }
   }
 }
@@ -104,8 +104,9 @@ Cloudflare Workers 服务, 通过 GitHub 自动部署运行, 使用 D1 存储数
 
 ### GET /api/fold-models/download
 
-下载 `fold-models.min.json` 同构的 JSON 数据文件（动态生成, 始终基于最新同步数据,
-优于仓库中的静态快照）。响应带 `Content-Disposition`, 浏览器直接触发下载。
+下载折叠屏机型的 JSON 数据文件（动态生成, 始终基于最新同步数据）。
+响应带 `Content-Disposition`, 浏览器直接触发下载; 可定期下载保存为
+`fold-models.min.json`（本地留存, 已被 `.gitignore` 排除）。
 
 - 返回: JSON 数组, 每项字段为 `model`, `brand`, `modelName`
 

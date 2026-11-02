@@ -35,6 +35,6 @@ POST {{host}}/api/sync
 POST {{host}}/api/sync
 x-sync-token: {{token}}
 
-### 触发 Cloudflare Workers 构建（deploy hook 地址由环境变量 deployHook 提供）
-POST {{deployHook}}
+### 触发 Cloudflare Workers 构建（deploy hook ID 由环境变量 cfToken 提供）
+POST https://api.cloudflare.com/client/v4/workers/builds/deploy_hooks/{{cfToken}}
 

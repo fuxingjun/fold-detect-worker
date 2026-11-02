@@ -4,6 +4,8 @@ coverage/
 .DS_Store
 # 本地开发凭据（wrangler dev 自动读取）
 .dev.vars
+# 定期从 /api/fold-models/download 下载的结果文件，不入库
+fold-models.min.json
 # HTTP 请求文件的环境变量在 .vscode/settings.json 的 rest-client.environmentVariables 配置，
 # 含真实 token/host/deployHook，因此整个 .vscode/ 不入库（配置说明见 README）
 .vscode/
