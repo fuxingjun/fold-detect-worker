@@ -70,7 +70,8 @@ Cloudflare Workers 服务, 通过 GitHub 自动部署运行, 使用 D1 存储数
 
 ### GET /
 
-返回服务功能和 API 列表说明, 包含 test-model 判定接口。
+服务首页, 由静态资源 `public/index.html` 直接服务（配置见 `wrangler.toml` 的 `[assets]`）,
+不经过 Worker 代码。提供 API 端点文档卡片、健康状态展示与在线「试一试」。
 
 ### GET /api/health
 

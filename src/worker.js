@@ -27,15 +27,7 @@ function json(data, init = {}) {
   });
 }
 
-function text(data, init = {}) {
-  return new Response(data, {
-    ...init,
-    headers: {
-      "content-type": "text/plain; charset=utf-8",
-      ...(init.headers || {})
-    }
-  });
-}
+// 首页 GET / 由静态资源 public/index.html 直接服务（见 wrangler.toml [assets]），不经过 Worker
 
 async function handleHealth(env) {
   const meta = await getSyncMeta(env.DB);
@@ -259,61 +251,6 @@ export default {
   async fetch(request, env) {
     await ensureInitialized(env);
     const url = new URL(request.url);
-
-    if (request.method === "GET" && url.pathname === "/") {
-      return text(
-        [
-          "fold-detect-worker",
-          "",
-          "Service: 折叠屏机型检索与同步服务",
-          "Storage: Cloudflare D1",
-          "Dataset: models.csv, 定时同步到 mobile_models 表",
-          "",
-          "Endpoints:",
-          "1) GET /api/health",
-          "   - 用途: 查看最近同步状态",
-          "   - 返回: ok, lastSyncCount, lastSyncAt",
-          "",
-          "2) GET /api/fold-models?keywords=Mate X,Magic V",
-          "   - 用途: 关键词匹配折叠机型",
-          "   - 参数: keywords 可选, 逗号分隔",
-          "   - 返回: keywords, total, data[]",
-          "",
-          "3) GET /api/fold-models/verify",
-          "   - 用途: 使用 test-model 打分策略筛选横向大折",
-          "   - 参数: min 可选, 1|true|yes 时返回精简字段",
-          "   - 返回: strategy, total, data[]",
-          "   - min=true 时 data 字段: model, brand, modelName",
-          "   - data 字段: model, brand, modelName, verName, confidence, score, reasons",
-          "",
-          "4) GET /api/fold-models/download",
-          "   - 用途: 下载 fold-models.min.json 同构数据文件",
-          "   - 返回: JSON 数组文件, 字段: model, brand, modelName",
-          "",
-          "5) GET /api/models",
-          "   - 用途: 按品牌或型号查询",
-          "   - 参数:",
-          "     brand, brand_match=fuzzy|exact",
-          "     model, model_match=fuzzy|exact",
-          "     limit=1~500",
-          "   - 约束: brand 和 model 至少传一个",
-          "",
-          "6) POST /api/sync",
-          "   - 用途: 手动触发数据同步",
-          "   - 鉴权: 配置 SYNC_TOKEN 时, 需要请求头 x-sync-token",
-          "   - 返回: ok, synced",
-          "",
-          "Notify:",
-          "- 同步完成后通过企业微信群机器人发送通知 (配置 WECOM_WEBHOOK)",
-          "- 数据有变更或同步失败时通知, 无变化时不打扰",
-          "",
-          "Quick Start:",
-          "- GET /api/health",
-          "- GET /api/fold-models/verify",
-          "- POST /api/sync"
-        ].join("\n")
-      );
-    }
 
     if (request.method === "GET" && url.pathname === "/api/health") {
       return handleHealth(env);

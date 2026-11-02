@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fold-detect-worker</title>
+<style>
+  :root {
+    --bg: #0b1020;
+    --bg-soft: #111832;
+    --card: #141b38;
+    --card-border: #232d55;
+    --text: #e8ecff;
+    --text-dim: #9aa5cc;
+    --accent: #6c8cff;
+    --accent-2: #38e1c2;
+    --code-bg: #0d1226;
+    --danger: #ff7a90;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    background: radial-gradient(1200px 600px at 80% -10%, #1b2a5e 0%, var(--bg) 55%);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.6;
+  }
+  .container { max-width: 1080px; margin: 0 auto; padding: 48px 24px 72px; }
+  header { text-align: center; margin-bottom: 40px; }
+  .logo { display: inline-flex; align-items: center; gap: 10px; font-size: 40px; margin-bottom: 12px; user-select: none; }
+  h1 { font-size: 32px; letter-spacing: 1px; }
+  .subtitle { color: var(--text-dim); font-size: 15px; }
+  .badges { display: flex; justify-content: center; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+  .badge {
+    font-size: 12px; padding: 4px 12px; border-radius: 999px;
+    background: var(--bg-soft); border: 1px solid var(--card-border); color: var(--text-dim);
+  }
+  .health { display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 20px; font-size: 13px; color: var(--text-dim); }
+  .health-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-dim); transition: background 0.3s; }
+  .health-dot.ok { background: var(--accent-2); box-shadow: 0 0 8px var(--accent-2); }
+  .health-dot.err { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+  .health-meta { font-variant-numeric: tabular-nums; }
+  .grid { display: grid; gap: 20px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+  .card {
+    background: var(--card); border: 1px solid var(--card-border); border-radius: 14px; padding: 20px;
+    display: flex; flex-direction: column; gap: 10px;
+    transition: transform 0.15s, border-color 0.15s;
+  }
+  .card:hover { transform: translateY(-3px); border-color: var(--accent); }
+  .card-head { display: flex; align-items: center; gap: 10px; }
+  .method { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 6px; letter-spacing: 0.5px; }
+  .method-get { background: rgba(56, 225, 194, 0.15); color: var(--accent-2); }
+  .method-post { background: rgba(255, 122, 144, 0.15); color: var(--danger); }
+  .path {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 13px; color: var(--accent); word-break: break-all;
+  }
+  h3 { font-size: 17px; }
+  .desc { font-size: 13px; color: var(--text-dim); }
+  .params { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .params th, .params td { text-align: left; padding: 5px 8px; border: 1px solid var(--card-border); }
+  .params th { color: var(--text-dim); font-weight: 500; width: 110px; }
+  .params td:last-child { color: var(--text-dim); }
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    background: var(--code-bg); padding: 1px 6px; border-radius: 4px; font-size: 12px;
+  }
+  .returns { font-size: 12px; color: var(--text-dim); word-break: break-all; }
+  .try-btn {
+    align-self: flex-start; margin-top: auto;
+    font-size: 13px; padding: 6px 18px; border-radius: 8px;
+    border: 1px solid var(--accent); background: transparent; color: var(--accent);
+    cursor: pointer; transition: background 0.15s, color 0.15s;
+  }
+  .try-btn:hover { background: var(--accent); color: #fff; }
+  .try-btn:disabled { opacity: 0.5; cursor: wait; }
+  .result { display: none; margin-top: 10px; border-radius: 10px; overflow: hidden; border: 1px solid var(--card-border); }
+  .result.show { display: block; }
+  .result-head {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 12px; background: var(--bg-soft); font-size: 12px; color: var(--text-dim);
+  }
+  .result-status { font-weight: 700; }
+  .result-status.s2 { color: var(--accent-2); }
+  .result-status.s4, .result-status.s5 { color: var(--danger); }
+  .result-body {
+    margin: 0; padding: 12px; max-height: 260px; overflow: auto;
+    background: var(--code-bg); font-size: 12px; line-height: 1.5;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    white-space: pre; color: #c7d2f5;
+  }
+  footer { text-align: center; margin-top: 48px; font-size: 12px; color: var(--text-dim); }
+  footer a { color: var(--accent); text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="logo">📱</div>
+    <h1>fold-detect-worker</h1>
+    <p class="subtitle">折叠屏机型检索与同步服务 · Cloudflare Workers + D1</p>
+    <div class="badges">
+      <span class="badge">Cloudflare Workers</span>
+      <span class="badge">D1 SQLite</span>
+      <span class="badge">Cron 每 6 小时同步</span>
+      <span class="badge">企业微信通知</span>
+    </div>
+    <div class="health">
+      <span class="health-dot" id="healthDot"></span>
+      <span id="healthText">检查同步状态中…</span>
+      <span class="health-meta" id="healthMeta"></span>
+    </div>
+  </header>
+
+  <main class="grid">
+    <section class="card">
+      <div class="card-head">
+        <span class="method method-get">GET</span>
+        <code class="path">/api/health</code>
+      </div>
+      <h3>健康检查</h3>
+      <p class="desc">查看最近同步的机型数量与时间</p>
+      <p class="returns">返回: <code>ok, lastSyncCount, lastSyncAt</code></p>
+      <button class="try-btn" data-path="/api/health">试一试</button>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <span class="method method-get">GET</span>
+        <code class="path">/api/fold-models</code>
+      </div>
+      <h3>关键词筛选</h3>
+      <p class="desc">按关键词匹配折叠屏机型, 不传则使用内置默认关键词</p>
+      <table class="params">
+        <thead><tr><th>参数</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td><code>keywords</code></td><td>可选, 逗号分隔, 如 Mate X,Magic V</td></tr>
+        </tbody>
+      </table>
+      <p class="returns">返回: <code>keywords, total, data[]</code></p>
+      <button class="try-btn" data-path="/api/fold-models">试一试</button>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <span class="method method-get">GET</span>
+        <code class="path">/api/fold-models/verify</code>
+      </div>
+      <h3>打分判定</h3>
+      <p class="desc">test-model 打分策略识别横向大折机型, 输出置信度与理由</p>
+      <table class="params">
+        <thead><tr><th>参数</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td><code>min</code></td><td>可选, 1|true|yes 时仅返回精简字段</td></tr>
+        </tbody>
+      </table>
+      <p class="returns">返回: <code>strategy, total, data[]</code></p>
+      <button class="try-btn" data-path="/api/fold-models/verify">试一试</button>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <span class="method method-get">GET</span>
+        <code class="path">/api/fold-models/download</code>
+      </div>
+      <h3>数据下载</h3>
+      <p class="desc">下载折叠屏机型 JSON 文件 (fold-models.min.json 同构, 动态生成)</p>
+      <p class="returns">返回: <code>JSON 文件: model, brand, modelName</code></p>
+      <button class="try-btn" data-path="/api/fold-models/download">试一试</button>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <span class="method method-get">GET</span>
+        <code class="path">/api/models</code>
+      </div>
+      <h3>机型查询</h3>
+      <p class="desc">按品牌/型号精确或模糊匹配查询全量机型数据</p>
+      <table class="params">
+        <thead><tr><th>参数</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td><code>brand</code></td><td>品牌, 如 华为</td></tr>
+          <tr><td><code>model</code></td><td>型号, 如 Mate X5</td></tr>
+          <tr><td><code>brand_match</code></td><td>fuzzy|exact, 默认 fuzzy</td></tr>
+          <tr><td><code>model_match</code></td><td>fuzzy|exact, 默认 fuzzy</td></tr>
+          <tr><td><code>limit</code></td><td>返回条数上限, 默认 100, 最大 500</td></tr>
+        </tbody>
+      </table>
+      <p class="returns">返回: <code>query, total, data[]</code></p>
+      <button class="try-btn" data-path="/api/models?brand=%E5%8D%8E&amp;limit=5">试一试</button>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <span class="method method-post">POST</span>
+        <code class="path">/api/sync</code>
+      </div>
+      <h3>手动同步</h3>
+      <p class="desc">触发一次数据同步; 配置 SYNC_TOKEN 时需请求头 x-sync-token</p>
+      <table class="params">
+        <thead><tr><th>参数</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td><code>x-sync-token</code></td><td>请求头, 鉴权令牌</td></tr>
+        </tbody>
+      </table>
+      <p class="returns">返回: <code>ok, synced, skipped, changed</code></p>
+    </section>
+  </main>
+
+  <footer>
+    数据来源: <a href="https://github.com/KHwang9883/MobileModels-csv" target="_blank" rel="noopener">MobileModels-csv</a>
+    · 同步完成后通过企业微信机器人推送变更通知
+  </footer>
+</div>
+
+<script>
+  // 健康检查: 页面加载后自动拉取 /api/health
+  (async () => {
+    const dot = document.getElementById("healthDot");
+    const text = document.getElementById("healthText");
+    const meta = document.getElementById("healthMeta");
+    try {
+      const res = await fetch("/api/health");
+      const data = await res.json();
+      if (data.ok) {
+        dot.classList.add("ok");
+        text.textContent = "服务正常";
+        meta.textContent = "· 上次同步 " + data.lastSyncCount + " 机型 · " + (data.lastSyncAt || "暂无");
+      } else {
+        throw new Error("not ok");
+      }
+    } catch (e) {
+      dot.classList.add("err");
+      text.textContent = "健康检查失败";
+    }
+  })();
+
+  // 试一试: 点击按钮请求对应端点, 结果就近展示在卡片内
+  document.querySelectorAll(".try-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const path = btn.dataset.path;
+      const card = btn.closest(".card");
+      let result = card.querySelector(".result");
+      if (!result) {
+        result = document.createElement("div");
+        result.className = "result";
+        result.innerHTML =
+          '<div class="result-head"><span>响应结果</span><span class="result-status"></span></div>' +
+          '<pre class="result-body"></pre>';
+        card.appendChild(result);
+      }
+      const status = result.querySelector(".result-status");
+      const body = result.querySelector(".result-body");
+      btn.disabled = true;
+      btn.textContent = "请求中…";
+      try {
+        const res = await fetch(path);
+        const text = await res.text();
+        status.textContent = "HTTP " + res.status;
+        status.className = "result-status s" + Math.floor(res.status / 100);
+        try {
+          body.textContent = JSON.stringify(JSON.parse(text), null, 2);
+        } catch {
+          body.textContent = text;
+        }
+      } catch (e) {
+        status.textContent = "请求失败";
+        status.className = "result-status s5";
+        body.textContent = String(e);
+      } finally {
+        result.classList.add("show");
+        btn.disabled = false;
+        btn.textContent = "试一试";
+      }
+    });
+  });
+</script>
+</body>
+</html>

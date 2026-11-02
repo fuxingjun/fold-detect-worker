@@ -149,21 +149,6 @@ describe("worker fetch", () => {
     expect(data.error).toBe("bad request");
   });
 
-  it("GET / should return detailed text docs", async () => {
-    const env = { DB: createMockDb(sampleRows) };
-    const request = new Request("https://example.com/");
-
-    const response = await worker.fetch(request, env);
-    const data = await response.text();
-
-    expect(response.status).toBe(200);
-    expect(response.headers.get("content-type")).toContain("text/plain");
-    expect(data).toContain("fold-detect-worker");
-    expect(data).toContain("GET /api/fold-models/verify");
-    expect(data).toContain("POST /api/sync");
-    expect(data).toContain("brand 和 model 至少传一个");
-  });
-
   it("GET /api/fold-models/verify should return test-model scoring result", async () => {
     const env = { DB: createMockDb(sampleRows) };
     const request = new Request("https://example.com/api/fold-models/verify");

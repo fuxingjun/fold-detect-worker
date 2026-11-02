@@ -2,6 +2,10 @@ name = "fold-detect-worker"
 main = "src/worker.js"
 compatibility_date = "2026-04-07"
 
+# 静态资源: / 由 public/index.html 直接服务, 未命中资源的请求回落到 Worker
+[assets]
+directory = "./public"
+
 [triggers]
 crons = ["0 */6 * * *"]
 
