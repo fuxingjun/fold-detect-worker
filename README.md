@@ -21,11 +21,36 @@ Cloudflare Workers 服务, 通过 GitHub 自动部署运行, 使用 D1 存储数
   - Binding Name: `DB`
   - Database: 直接按名称选择你创建的 D1 数据库
 - Variables and Secrets:
-  - `SYNC_TOKEN`（可选，建议配置）
+  - `SYNC_TOKEN`（可选，建议配置，请添加为 **Secret**）
   - `DATASET_URL`（可选）
-  - `WECOM_WEBHOOK`（可选，企业微信通知）
+  - `WECOM_WEBHOOK`（可选，企业微信通知，请添加为 **Secret**）
+
+> 注意: 敏感凭据（`SYNC_TOKEN`、`WECOM_WEBHOOK`）不要写在 `wrangler.toml` 的 `[vars]` 中，
+> 否则会随仓库明文提交。生产环境用 Secret（`npx wrangler secret put SYNC_TOKEN`），
+> 本地开发写入项目根目录的 `.dev.vars` 文件（已被 `.gitignore` 排除，`wrangler dev` 自动读取）。
 
 4. 保存并重新部署一次。
+
+## HTTP 请求文件（http/ 目录）
+
+使用 VSCode REST Client 插件执行 `http/fold-detect.http` 中的请求。
+请求里的 `{{host}}`、`{{token}}`、`{{deployHook}}` 环境变量读取自 `.vscode/settings.json` 的
+`rest-client.environmentVariables`（该文件含真实凭据，已被 `.gitignore` 排除）。
+新环境按以下模板在本地 `.vscode/settings.json` 中配置:
+
+```json
+{
+  "rest-client.environmentVariables": {
+    "local": {
+      "host": "https://your-workers-domain",
+      "token": "your-sync-token",
+      "deployHook": "https://api.cloudflare.com/client/v4/workers/builds/deploy_hooks/your-hook-id"
+    }
+  }
+}
+```
+
+执行请求前在 REST Client 插件中切换到对应环境（如 `local`）。
 
 ## 企业微信通知
 
@@ -76,6 +101,13 @@ Cloudflare Workers 服务, 通过 GitHub 自动部署运行, 使用 D1 存储数
 
 - `GET /api/fold-models/verify`
 - `GET /api/fold-models/verify?min=true`
+
+### GET /api/fold-models/download
+
+下载 `fold-models.min.json` 同构的 JSON 数据文件（动态生成, 始终基于最新同步数据,
+优于仓库中的静态快照）。响应带 `Content-Disposition`, 浏览器直接触发下载。
+
+- 返回: JSON 数组, 每项字段为 `model`, `brand`, `modelName`
 
 ### GET /api/models
 

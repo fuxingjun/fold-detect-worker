@@ -36,7 +36,9 @@ const obviousNonFoldPattern =
   /ipad|tablet|tab\b|watch|band|router|earbuds|notebook|laptop|pc\b|computer|matebook|tv|smart.?display/i;
 
 const brandFamilies = [
-  { brand: /huawei|华为/i, model: /mate\s*x|x[t|s]?\b/i, score: 2 },
+  // 华为: Mate X / Xs / XT 系列（x[t|s]?\b 中 [ts] 为字符类，匹配 x、xs、xt；
+  // 原写法 [t|s] 把竖线当成了字面量，属笔误，行为上碰巧无差异）
+  { brand: /huawei|华为/i, model: /mate\s*x|x[ts]?\b/i, score: 2 },
   { brand: /honor|荣耀/i, model: /magic\s*v|vs\b/i, score: 2 },
   { brand: /samsung|三星/i, model: /z\s*fold|w\d{2}/i, score: 2 },
   { brand: /xiaomi|小米|redmi/i, model: /mix\s*fold/i, score: 2 },

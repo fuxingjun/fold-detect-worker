@@ -199,6 +199,24 @@ describe("worker fetch", () => {
     expect(data.data[0]).not.toHaveProperty("reasons");
   });
 
+  it("GET /api/fold-models/download should return min.json-format file", async () => {
+    const env = { DB: createMockDb(sampleRows) };
+    const request = new Request("https://example.com/api/fold-models/download");
+
+    const response = await worker.fetch(request, env);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    // 响应为 JSON 数组文件（fold-models.min.json 同构），触发浏览器下载
+    expect(response.headers.get("content-type")).toContain("application/json");
+    expect(response.headers.get("content-disposition")).toBe(
+      'attachment; filename="fold-models.min.json"'
+    );
+    expect(Array.isArray(data)).toBe(true);
+    expect(data.length).toBeGreaterThanOrEqual(1);
+    expect(Object.keys(data[0]).sort()).toEqual(["brand", "model", "modelName"]);
+  });
+
   it("POST /api/sync should check token", async () => {
     const env = {
       DB: createMockDb(),

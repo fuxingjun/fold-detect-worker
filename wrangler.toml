@@ -12,6 +12,10 @@ database_name = "fold-detect-db"
 [vars]
 DATASET_URL = "https://raw.githubusercontent.com/KHwang9883/MobileModels-csv/main/models.csv"
 
+# 敏感凭据不要写在 [vars]（会随仓库明文提交，Dashboard/日志中可见）：
+# - 生产环境: npx wrangler secret put SYNC_TOKEN / WECOM_WEBHOOK（或 Dashboard 配置为 Secret）
+# - 本地开发: 写入 .dev.vars 文件（已加入 .gitignore，wrangler dev 自动读取）
+
 [observability.logs]
 enabled = true
 head_sampling_rate = 1

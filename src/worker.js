@@ -42,10 +42,8 @@ async function handleHealth(env) {
   return json({ ok: true, ...meta });
 }
 
-async function handleFoldModels(request, env) {
-  const { searchParams } = new URL(request.url);
-  const keywords = splitKeywords(searchParams.get("keywords"), DEFAULT_FOLD_KEYWORDS);
-
+// 折叠屏相关接口共用: 读取全表机型数据（数据量约 1.3 万行，D1 读限额内可承受）
+async function fetchAllMobileRows(env) {
   const { results } = await env.DB.prepare(
     `
     SELECT model, brand_title, model_name, ver_name
@@ -54,7 +52,15 @@ async function handleFoldModels(request, env) {
     `
   ).all();
 
-  const data = buildFoldModels(results || [], keywords);
+  return results || [];
+}
+
+async function handleFoldModels(request, env) {
+  const { searchParams } = new URL(request.url);
+  const keywords = splitKeywords(searchParams.get("keywords"), DEFAULT_FOLD_KEYWORDS);
+
+  const rows = await fetchAllMobileRows(env);
+  const data = buildFoldModels(rows, keywords);
   return json({ keywords, total: data.length, data });
 }
 
@@ -67,15 +73,8 @@ async function handleFoldVerify(request, env) {
   const { searchParams } = new URL(request.url);
   const min = parseMinMode(searchParams.get("min"));
 
-  const { results } = await env.DB.prepare(
-    `
-    SELECT model, brand_title, model_name, ver_name
-    FROM mobile_models
-    ORDER BY brand_title ASC, model_name ASC
-    `
-  ).all();
-
-  const fullData = pickFoldableModels(results || []);
+  const rows = await fetchAllMobileRows(env);
+  const fullData = pickFoldableModels(rows);
   const data = min
     ? fullData.map(({ model, brand, modelName }) => ({ model, brand, modelName }))
     : fullData;
@@ -85,6 +84,24 @@ async function handleFoldVerify(request, env) {
     min,
     total: data.length,
     data
+  });
+}
+
+// 下载接口: 动态生成与 fold-models.min.json 同构的文件（仅 model/brand/modelName 字段），
+// 相比仓库里的静态快照始终与最新同步数据保持一致
+async function handleFoldDownload(env) {
+  const rows = await fetchAllMobileRows(env);
+  const data = pickFoldableModels(rows).map(({ model, brand, modelName }) => ({
+    model,
+    brand,
+    modelName
+  }));
+
+  return new Response(JSON.stringify(data), {
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "content-disposition": 'attachment; filename="fold-models.min.json"'
+    }
   });
 }
 
@@ -269,7 +286,11 @@ export default {
           "   - min=true 时 data 字段: model, brand, modelName",
           "   - data 字段: model, brand, modelName, verName, confidence, score, reasons",
           "",
-          "4) GET /api/models",
+          "4) GET /api/fold-models/download",
+          "   - 用途: 下载 fold-models.min.json 同构数据文件",
+          "   - 返回: JSON 数组文件, 字段: model, brand, modelName",
+          "",
+          "5) GET /api/models",
           "   - 用途: 按品牌或型号查询",
           "   - 参数:",
           "     brand, brand_match=fuzzy|exact",
@@ -277,7 +298,7 @@ export default {
           "     limit=1~500",
           "   - 约束: brand 和 model 至少传一个",
           "",
-          "5) POST /api/sync",
+          "6) POST /api/sync",
           "   - 用途: 手动触发数据同步",
           "   - 鉴权: 配置 SYNC_TOKEN 时, 需要请求头 x-sync-token",
           "   - 返回: ok, synced",
@@ -304,6 +325,10 @@ export default {
 
     if (request.method === "GET" && url.pathname === "/api/fold-models/verify") {
       return handleFoldVerify(request, env);
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/fold-models/download") {
+      return handleFoldDownload(env);
     }
 
     if (request.method === "POST" && url.pathname === "/api/sync") {

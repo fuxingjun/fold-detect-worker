@@ -16,6 +16,9 @@ GET {{host}}/api/fold-models/verify
 ### test-model 打分判定接口, 精简返回模式, 对齐 fold-models.min.json
 GET {{host}}/api/fold-models/verify?min=true
 
+### 下载 fold-models.min.json 同构数据文件（动态生成）
+GET {{host}}/api/fold-models/download
+
 ### 品牌模糊查询
 GET {{host}}/api/models?brand=华&brand_match=fuzzy
 
@@ -30,4 +33,8 @@ POST {{host}}/api/sync
 
 ### 手动触发同步, 携带Token
 POST {{host}}/api/sync
-x-sync-token: your-sync-token
+x-sync-token: {{token}}
+
+### 触发 Cloudflare Workers 构建（deploy hook 地址由环境变量 deployHook 提供）
+POST {{deployHook}}
+
