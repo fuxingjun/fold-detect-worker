@@ -103,12 +103,13 @@ Cloudflare Workers 服务, 通过 GitHub 自动部署运行, 使用 D1 存储数
 - `GET /api/fold-models/verify`
 - `GET /api/fold-models/verify?min=true`
 
-### GET /api/fold-models/download
+### GET /api/fold-models/data
 
-下载折叠屏机型的 JSON 数据文件（动态生成, 始终基于最新同步数据）。
-响应带 `Content-Disposition`, 浏览器直接触发下载; 可定期下载保存为
-`fold-models.min.json`（本地留存, 已被 `.gitignore` 排除）。
+查看或下载折叠屏机型数据（动态生成, 始终基于最新同步数据）。
 
+- 默认直接返回 JSON（inline, 适合浏览器新标签页查看）
+- 带 `?download=1` 时响应 `Content-Disposition: attachment`, 浏览器直接触发下载,
+  可定期下载保存为 `fold-models.min.json`（本地留存, 已被 `.gitignore` 排除）
 - 返回: JSON 数组, 每项字段为 `model`, `brand`, `modelName`
 
 ### GET /api/models

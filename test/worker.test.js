@@ -184,22 +184,35 @@ describe("worker fetch", () => {
     expect(data.data[0]).not.toHaveProperty("reasons");
   });
 
-  it("GET /api/fold-models/download should return min.json-format file", async () => {
+  it("GET /api/fold-models/data should return inline JSON by default", async () => {
     const env = { DB: createMockDb(sampleRows) };
-    const request = new Request("https://example.com/api/fold-models/download");
+    const request = new Request("https://example.com/api/fold-models/data");
 
     const response = await worker.fetch(request, env);
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    // 响应为 JSON 数组文件（fold-models.min.json 同构），触发浏览器下载
+    // 默认 inline 返回 JSON, 供浏览器新标签页直接查看
     expect(response.headers.get("content-type")).toContain("application/json");
-    expect(response.headers.get("content-disposition")).toBe(
-      'attachment; filename="fold-models.min.json"'
-    );
+    expect(response.headers.get("content-disposition")).toBe("inline");
     expect(Array.isArray(data)).toBe(true);
     expect(data.length).toBeGreaterThanOrEqual(1);
     expect(Object.keys(data[0]).sort()).toEqual(["brand", "model", "modelName"]);
+  });
+
+  it("GET /api/fold-models/data?download=1 should return attachment file", async () => {
+    const env = { DB: createMockDb(sampleRows) };
+    const request = new Request("https://example.com/api/fold-models/data?download=1");
+
+    const response = await worker.fetch(request, env);
+
+    expect(response.status).toBe(200);
+    // download=1 时以附件形式触发浏览器下载
+    expect(response.headers.get("content-disposition")).toBe(
+      'attachment; filename="fold-models.min.json"'
+    );
+    const data = await response.json();
+    expect(Array.isArray(data)).toBe(true);
   });
 
   it("POST /api/sync should check token", async () => {

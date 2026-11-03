@@ -40,6 +40,11 @@ const obviousNonFoldPattern =
   /ipad|tablet|tab\b|watch|band|router|earbuds|notebook|laptop|pc\b|computer|matebook|tv|smart.?display/i;
 
 const brandFamilies = [
+  // 三星心系天下 W20~W26 (中国电信定制横向大折, 名称不含 fold), 单独给足 3 分收录;
+  // 不能用通用关键词: 华为平板型号后缀 -W20 会被误伤, 故限定三星品牌;
+  // 模式 w2\d 覆盖 W20~W29 (每年 10 月迭代一代, W27 已于 2026-10 发布),
+  // \b 边界排除 W2013~W2019 老式翻盖双屏机; W2x Flip 竖折版会被 flip 扣分压回
+  { brand: /samsung|三星/i, model: /\bw2\d\b/i, score: 3 },
   // 华为: Mate X / Xs / XT 系列（x[ts]?\b 中 [ts] 为字符类，匹配 x、xs、xt；
   // 原写法 [t|s] 把竖线当成了字面量，属笔误，行为上碰巧无差异）
   // 注: Pura X / Pura X Max 为 16:10 阔折叠, 暂不纳入识别目标,

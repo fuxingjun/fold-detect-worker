@@ -79,9 +79,13 @@ async function handleFoldVerify(request, env) {
   });
 }
 
-// 下载接口: 动态生成与 fold-models.min.json 同构的文件（仅 model/brand/modelName 字段），
-// 相比仓库里的静态快照始终与最新同步数据保持一致
-async function handleFoldDownload(env) {
+// 机型数据接口 (/api/fold-models/data): 动态生成与 fold-models.min.json 同构的数据
+// （仅 model/brand/modelName 字段）, 相比仓库里的静态快照始终与最新同步数据保持一致。
+// 默认 inline 返回 JSON (供页面"查看"新标签页打开); ?download=1 时以附件形式触发浏览器下载
+async function handleFoldDownload(request, env) {
+  const { searchParams } = new URL(request.url);
+  const isDownload = ["1", "true"].includes((searchParams.get("download") || "").toLowerCase());
+
   const rows = await fetchAllMobileRows(env);
   const data = pickFoldableModels(rows).map(({ model, brand, modelName }) => ({
     model,
@@ -92,7 +96,9 @@ async function handleFoldDownload(env) {
   return new Response(JSON.stringify(data), {
     headers: {
       "content-type": "application/json; charset=utf-8",
-      "content-disposition": 'attachment; filename="fold-models.min.json"'
+      "content-disposition": isDownload
+        ? 'attachment; filename="fold-models.min.json"'
+        : "inline"
     }
   });
 }
@@ -264,8 +270,8 @@ export default {
       return handleFoldVerify(request, env);
     }
 
-    if (request.method === "GET" && url.pathname === "/api/fold-models/download") {
-      return handleFoldDownload(env);
+    if (request.method === "GET" && url.pathname === "/api/fold-models/data") {
+      return handleFoldDownload(request, env);
     }
 
     if (request.method === "POST" && url.pathname === "/api/sync") {

@@ -16,8 +16,11 @@ GET {{host}}/api/fold-models/verify
 ### test-model 打分判定接口, 精简返回模式, 对齐 fold-models.min.json
 GET {{host}}/api/fold-models/verify?min=true
 
-### 下载 fold-models.min.json 同构数据文件（动态生成）
-GET {{host}}/api/fold-models/download
+### 查看 fold-models.min.json 同构数据（inline JSON）
+GET {{host}}/api/fold-models/data
+
+### 下载 fold-models.min.json 同构数据文件（attachment, 动态生成）
+GET {{host}}/api/fold-models/data?download=1
 
 ### 品牌模糊查询
 GET {{host}}/api/models?brand=华&brand_match=fuzzy

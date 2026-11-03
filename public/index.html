@@ -67,6 +67,8 @@
     background: var(--code-bg); padding: 1px 6px; border-radius: 4px; font-size: 12px;
   }
   .returns { font-size: 12px; color: var(--text-dim); word-break: break-all; }
+  /* 查看/下载双按钮行 */
+  .btn-row { display: flex; gap: 10px; margin-top: auto; align-self: flex-start; }
   .try-btn {
     align-self: flex-start; margin-top: auto;
     font-size: 13px; padding: 6px 18px; border-radius: 8px;
@@ -162,12 +164,16 @@
     <section class="card">
       <div class="card-head">
         <span class="method method-get">GET</span>
-        <code class="path">/api/fold-models/download</code>
+        <code class="path">/api/fold-models/data</code>
       </div>
-      <h3>数据下载</h3>
-      <p class="desc">下载折叠屏机型 JSON 文件 (fold-models.min.json 同构, 动态生成)</p>
-      <p class="returns">返回: <code>JSON 文件: model, brand, modelName</code></p>
-      <button class="try-btn" data-download="/api/fold-models/download">下载</button>
+      <h3>数据查看/下载</h3>
+      <p class="desc">查看或下载折叠屏机型数据 (fold-models.min.json 同构, 动态生成)</p>
+      <p class="returns">返回: <code>JSON: model, brand, modelName</code></p>
+      <p class="returns">参数: <code>download=1 时以文件形式下载, 默认直接返回 JSON</code></p>
+      <div class="btn-row">
+        <button class="try-btn" data-view="/api/fold-models/data">查看</button>
+        <button class="try-btn" data-download="/api/fold-models/data?download=1">下载</button>
+      </div>
     </section>
 
     <section class="card">
@@ -235,6 +241,13 @@
       text.textContent = "健康检查失败";
     }
   })();
+
+  // 查看按钮: 新标签页打开, 默认 inline 返回 JSON 由浏览器直接展示
+  document.querySelectorAll(".try-btn[data-view]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      window.open(btn.dataset.view, "_blank", "noopener");
+    });
+  });
 
   // 下载按钮: 借助隐藏锚点触发浏览器原生下载, 响应的 Content-Disposition 会让浏览器保存为文件
   document.querySelectorAll(".try-btn[data-download]").forEach((btn) => {
