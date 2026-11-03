@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>fold-detect-worker</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <style>
   :root {
     --bg: #0b1020;
@@ -166,7 +167,7 @@
       <h3>数据下载</h3>
       <p class="desc">下载折叠屏机型 JSON 文件 (fold-models.min.json 同构, 动态生成)</p>
       <p class="returns">返回: <code>JSON 文件: model, brand, modelName</code></p>
-      <button class="try-btn" data-path="/api/fold-models/download">试一试</button>
+      <button class="try-btn" data-download="/api/fold-models/download">下载</button>
     </section>
 
     <section class="card">
@@ -235,8 +236,20 @@
     }
   })();
 
+  // 下载按钮: 借助隐藏锚点触发浏览器原生下载, 响应的 Content-Disposition 会让浏览器保存为文件
+  document.querySelectorAll(".try-btn[data-download]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const anchor = document.createElement("a");
+      anchor.href = btn.dataset.download;
+      anchor.download = "";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+    });
+  });
+
   // 试一试: 点击按钮请求对应端点, 结果就近展示在卡片内
-  document.querySelectorAll(".try-btn").forEach((btn) => {
+  document.querySelectorAll(".try-btn[data-path]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const path = btn.dataset.path;
       const card = btn.closest(".card");

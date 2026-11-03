@@ -22,6 +22,8 @@ const horizontalFoldNamePattern = new RegExp(
     "open",
     "phantom\\s*v\\s*fold",
     "tri\\s*fold",
+    // Apple 首款折叠屏 iPhone Duo (2026, 横向内折); 用 iphone 前缀限定, 避免误伤其他 duo 命名
+    "iphone\\s*duo",
     "fold",
     "折叠",
     "大折",
@@ -31,13 +33,17 @@ const horizontalFoldNamePattern = new RegExp(
 );
 
 const weakHorizontalFoldHintPattern = /book.?style|横向内折|横向折叠|内折|对折/i;
-const clamshellFoldPattern = /flip|razr|folder|pocket|贝壳|小折|竖向外折|竖向/i;
+// razr 用负向前瞻排除 "razr fold" 组合: Motorola 2026 年的 Razr Fold 是横向大折,
+// 不能被 razr 关键词误杀; 其余 razr 系列 (razr 40/50 等) 仍按竖向小折扣分
+const clamshellFoldPattern = /flip|razr(?!\s*fold)|folder|pocket|贝壳|小折|竖向外折|竖向/i;
 const obviousNonFoldPattern =
   /ipad|tablet|tab\b|watch|band|router|earbuds|notebook|laptop|pc\b|computer|matebook|tv|smart.?display/i;
 
 const brandFamilies = [
-  // 华为: Mate X / Xs / XT 系列（x[t|s]?\b 中 [ts] 为字符类，匹配 x、xs、xt；
+  // 华为: Mate X / Xs / XT 系列（x[ts]?\b 中 [ts] 为字符类，匹配 x、xs、xt；
   // 原写法 [t|s] 把竖线当成了字面量，属笔误，行为上碰巧无差异）
+  // 注: Pura X / Pura X Max 为 16:10 阔折叠, 暂不纳入识别目标,
+  // 当前仅命中品牌家族 +2 分 (<3 阈值), 不会被误收
   { brand: /huawei|华为/i, model: /mate\s*x|x[ts]?\b/i, score: 2 },
   { brand: /honor|荣耀/i, model: /magic\s*v|vs\b/i, score: 2 },
   { brand: /samsung|三星/i, model: /z\s*fold|w\d{2}/i, score: 2 },
